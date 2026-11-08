@@ -1,34 +1,67 @@
-# AFCAWS CloudSim Demo
+# Adaptive Fair and Capacity-Aware Workflow Scheduler (AFCAWS)
 
-This project runs the supplied AFCAWS scheduling example with CloudSim 3.0.3. It creates one datacenter, 50 VMs, and 250 synthetic cloudlets.
+AFCAWS is a workflow scheduling approach for cloud datacenters that combines workflow urgency, resource fit, dominant-resource fairness, and expected machine availability. A reinforcement-learning agent selects a scheduling weight profile based on observed cluster conditions, while a safety validator is intended to enforce resource and workflow-dependency constraints.
 
-The scoring metrics in `AFCAWSBroker` are placeholders, and the RL agent uses a rule-based profile selector rather than a trained Q-learning model. This demo does not reproduce the experimental results or WfCommons workflow evaluation described in the accompanying paper.
+This repository contains a small CloudSim demonstration inspired by AFCAWS. It is not the full experimental implementation described in the accompanying paper text. The paper’s results below are reported results, not results reproduced by this repository.
 
-## Findings and Results
+## How AFCAWS is designed
 
-The project records a successful local functional run: all 250 synthetic cloudlets reported `SUCCESS` across 50 VMs in one datacenter. This is a demo result, not a result from the paper or a reproduced experiment.
+The proposed architecture has three layers:
 
-| Aspect | Paper evaluation described for this project | This repository |
-|---|---|---|
-| Workload | WfCommons workflow DAG traces | 250 synthetic cloudlets |
-| Scheduler comparison | Five baseline schedulers | No baseline comparison |
-| Capacity scenarios | Dynamic capacity drops | Not modeled |
-| Repetitions | 30 independent runs | One previously recorded functional run |
-| Result | Paper's quantitative results are not included here | 250/250 cloudlets completed successfully in the recorded run |
+1. **Workload and event generator** — supplies scientific workflow DAGs and capacity-event traces.
+2. **AFCAWS core engine** — monitors cluster state, selects a weight profile, scores scheduling choices, and applies fallback and safety checks.
+3. **Simulation environment** — models the datacenter, hosts, and virtual machines in CloudSim.
 
-The results are not directly comparable. This demo does not reproduce the paper's workload, baselines, capacity scenarios, or repeated-run protocol. Utilization, fairness, and termination inputs are placeholders, and scheduling scores include random values. Consequently, the successful cloudlet count only confirms the recorded demo run; it does not establish a performance improvement over the paper's baselines.
+The scheduling score combines four factors:
 
-The paper itself and its citation are not included in this repository, so its reported numerical metrics cannot be independently verified or reproduced from the available project files.
+```text
+Score = W1(Urgency) + W2(Resource fit) + W3(Fairness) + W4(Availability)
+```
+
+The paper describes a Q-learning agent whose state includes ready-queue length, average utilization, variation in dominant resource shares, and recent task termination rate. It selects among five predefined profiles favoring urgency, fairness, availability, resource fit, or a balanced combination. Its reward is designed to favor utilization while penalizing terminations, makespan, and unfairness.
+
+## Reported evaluation
+
+The supplied paper text describes experiments with WfCommons Pegasus workflows (Epigenomics, Montage, and SIPHT), five scheduling baselines, capacity events, and 30 independent runs per configuration. It reports the following results:
+
+| Scheduler | Average completion time (s) | Makespan (s) | Deadline misses | Jain fairness | CPU utilization |
+|---|---:|---:|---:|---:|---:|
+| FCFS | 4,250 | 18,400 | 14.2% | 0.45 | 65.2% |
+| DRF | 3,890 | 16,100 | 8.5% | 0.98 | 72.4% |
+| Workflow-Aware (WA) | 2,950 | 14,200 | 5.1% | 0.62 | 81.5% |
+| Fixed-Weight AFCAWS | 2,820 | 13,900 | 4.4% | 0.85 | 86.3% |
+| AFCAWS | 2,522 | 12,850 | 2.1% | 0.89 | 89.1% |
+
+For stochastic capacity events, the paper reports 116 task terminations and 315 CPU-hours of repeated work for AFCAWS, compared with 150 terminations and 420 CPU-hours for the Capacity-Aware baseline. It also reports an average scheduling decision overhead of 12 ms for AFCAWS.
+
+These figures summarize the supplied paper text; they have not been independently verified or reproduced from this repository. The paper text describes CloudSim 5.0 with custom extensions, while this project currently depends on CloudSim 3.0.3.
+
+## What this repository implements
+
+The current demo creates one datacenter with 13 hosts, 50 VMs, and 250 synthetic cloudlets. Its broker uses a simplified profile selector, but the scoring inputs are placeholders and several score components return random values. It does not currently implement the paper’s WfCommons DAG workloads, baseline comparisons, dynamic capacity events, trained Q-learning, or 30-run evaluation. A successful demo run therefore does not validate or reproduce the reported paper results.
 
 ## Requirements
 
-- JDK 25 (the latest LTS release) or newer
+- JDK 25 or newer
 - Maven 3.6 or newer
 
-## Run
+## Run the demo
 
 From the project directory:
 
 ```shell
 mvn compile exec:java
 ```
+
+The program prints the status and timing information for each simulated cloudlet.
+
+## References
+
+The supplied paper text cites the following background work:
+
+1. Calheiros, R. N., et al. (2011). “CloudSim: a toolkit for modeling and simulation of cloud computing environments and evaluation of resource provisioning algorithms.” *Software: Practice and Experience*, 41(1), 23–50.
+2. Ghodsi, A., et al. (2011). “Dominant Resource Fairness: Fair Allocation of Multiple Resource Types.” *NSDI*.
+3. Ferreira da Silva, R., et al. (2020). “WfCommons: A framework for enabling scientific workflow research and development.” *Future Generation Computer Systems*, 112, 1–13.
+4. Mao, M., & Humphrey, M. (2012). “Auto-scaling to minimize cost and meet application deadlines in cloud workflows.” *SC*.
+5. Cheng, M., Li, J., & Nazarian, S. (2018). “DRL-cloud: Deep reinforcement learning based resource provisioning and task scheduling for cloud environments.” *GLSVLSI*.
+6. Topcuoglu, H., Hariri, S., & Wu, M. Y. (2002). “Performance-effective and low-complexity task scheduling for heterogeneous computing.” *IEEE Transactions on Parallel and Distributed Systems*, 13(3), 260–274.
